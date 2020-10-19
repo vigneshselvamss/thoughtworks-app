@@ -28,17 +28,10 @@
          - unzip
 
 
-    #- name: install php7.3-mbstring
-    #  command: apt install php7.4-mbstring
-
-  #  - name: install xml
-    #  command: apt install php7.4-xml
-
     - name: Install
       command: phpenmod mbstring xml
-
-  #  - name: install python3-pip
-  #    command: apt install python-pip
+      notify:
+         - Restart apache2
 
     - name: Make sure pymysql is present
       pip:
@@ -97,3 +90,8 @@
     - name: Run the command if the specified file does not exist.
       command: ln -s /var/www/mediawiki /var/www/html/mediawiki
 
+  handlers:
+    - name: Restart apache2
+      service:
+        name: httpd
+        state: restarted
