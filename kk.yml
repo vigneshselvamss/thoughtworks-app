@@ -1,0 +1,75 @@
+---
+- hosts: localhost
+  become: true
+
+  tasks:
+    - name: Install Application prerequisites
+      apt:
+        name:
+         - apache2
+         - mysql-server 
+         - php7.3
+         - php-mysqli
+         - libapache2-mod-php
+         - php-xml
+         - php-mbstring
+         - php-apcu 
+         - php-intl 
+         - imagemagick  
+         - inkscape 
+         - php-gd 
+         - php-cli 
+         - php-curl 
+         - git
+
+    - name: Start service mysqld, if not started
+      service:
+       name: mysql
+       state: started
+
+    - name: Create a new database with name wikidatabase
+      mysql_db:
+       name: wikidatabase
+       state: present
+       login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: "Create user {{ user }}"
+      mysql_user:
+       name: wiki'@'localhost
+       password: P@ssword123
+       host: localhost
+       state: present
+       update_password: on_create
+       priv: '*.*:ALL,GRANT' 
+       login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Create user with password, all database privileges and 'WITH GRANT OPTION' in db1 and db2
+      mysql_db:
+        name: wikidatabase
+        state: present
+        login_user: wiki'@'localhost
+        login_password: P@ssword123
+
+    - name: Enable services for automatic start
+      service:
+        name: "{{ item }}"
+        enabled: yes
+      with_items:
+        - apache2
+        - mysql
+
+    - name: command module
+      command: wget https://releases.wikimedia.org/mediawiki/1.35/mediawiki-1.35.0.tar.gz 
+
+
+    - name: Extract mediawiki-1.35.0.tar.gz /var/www/
+      unarchive:
+        src: mediawiki-1.35.0.tar.gz
+        dest: /var/www/
+        remote_src: yes  
+
+    - name: Run the command if the specified file does not exist.
+      command: ln -s /var/www/mediawiki /var/www/html/mediawiki
+
+
+
