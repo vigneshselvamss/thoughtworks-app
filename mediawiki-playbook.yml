@@ -28,7 +28,7 @@
          - unzip
 
 
-    - name: Install
+    - name: Install mbstring & xml
       command: phpenmod mbstring xml
       notify:
          - Restart apache2
@@ -59,7 +59,7 @@
        priv: '*.*:ALL,GRANT'
        login_unix_socket: /var/run/mysqld/mysqld.sock
 
-    - name: Create user with password, all database privileges and 'WITH GRANT OPTION' in db1 and db2
+    - name: Create user with password
       mysql_db:
         name: wikidatabase
         state: present
@@ -74,20 +74,20 @@
         - apache2
         - mysql
 
-    - name: command module
+    - name: Downloading the Mediawiki Application.
       command: wget https://releases.wikimedia.org/mediawiki/1.35/mediawiki-1.35.0.tar.gz
 
 
-    - name: Extract mediawiki-1.35.0.tar.gz /var/www/
+    - name: Extract Mediawiki Application.
       unarchive:
         src: /home/ubuntu/thoughtworks-app/mediawiki-1.35.0.tar.gz
         dest: /var/www/
         remote_src: yes
 
-    - name: Rename
+    - name: Rename the Application.
       command: mv /var/www/mediawiki-1.35.0 /var/www/mediawiki
 
-    - name: Run the command if the specified file does not exist.
+    - name: Create Symlinks to /var/www/html/mediawiki.
       command: ln -s /var/www/mediawiki /var/www/html/mediawiki
 
   handlers:
