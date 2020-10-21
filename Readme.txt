@@ -4,10 +4,10 @@ Step 1:
  Clone the git repository by using this url : git clone https://github.com/vigneshselvamss/thoughtworks-app
 
 Step 2:
-  Run the VPC CFT Template it will create VPC, Two PublicSubnet, RouteTable and IGW.
+  Run the VPC CFT Template in US-West-2 region it will create VPC, Two PublicSubnet, RouteTable and IGW. 
 
 Step 3:
-  Run the EC2 CFT Template. It will create the EC2 instance on boot time it will download the
+  Run the EC2 CFT Template in US-West-2 region. It will create the EC2 instance on boot time it will download the
   Ansible playbook from the git repository and run the playbook into the Ec2 machine as localhost.
 
   The playbook will Configure the Mediawiki Application inside the EC2 machine.
