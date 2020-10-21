@@ -1,0 +1,156 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This Stack Create Ec2 Instance and Configure Mediawiki Application'
+#Programer: Vignesh.selvam
+
+Parameters:
+  VolumeSize:
+    Type: String
+    Default: 20
+
+  DisableApiTermination:
+    Type: String
+    Default: false
+
+  EbsOptimized:
+    Type: String
+    Default: false
+
+  IamInstanceProfile:
+    Type: String
+    Default: false
+
+  ImageId:
+    Type: String
+    Default: ami-003ba08113592046f
+
+  Environment:
+     Type: String
+     AllowedValues: [dev, tst, int, uat, prd, poc]
+     Default: dev
+
+  InstanceType:
+    Type: String
+    AllowedValues: [t2.micro, t2.small, t3.large]
+    Default: t2.small
+
+  KeyName:
+    Type: String
+
+  Monitoring:
+    Type: String
+    Default: false
+
+  PlacementGroupName:
+    Type: String
+    Default: false
+
+  Tenancy:
+    Type: String
+    AllowedValues: [dedicated, default, host]
+    Default: default
+
+  SourceDestCheck:
+    Type: String
+    Default: false
+
+  CostCenter:
+    Type: String
+    Default: IND
+
+  Project:
+    Type: String
+    Default: mediawiki
+
+  Support:
+    Type: String
+    Default: vignesh.selvam
+
+  Name:
+    Type: String
+    Default: Mediawiki-Application
+
+Conditions:
+  isIamInstanceProfile: !Not [!Equals [!Ref IamInstanceProfile, false]]
+  isPlacementGroupName: !Not [!Equals [!Ref PlacementGroupName, false]]
+
+Resources:
+  CreateEc2:
+   Type: AWS::EC2::Instance
+   Properties:
+      AvailabilityZone:
+        Fn::ImportValue:
+           !Sub "mediawiki-vpc-${Environment}-subnet1-zone-id"
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sdm"
+          Ebs:
+            VolumeType: "gp2"
+            DeleteOnTermination: "false"
+            VolumeSize: !Ref VolumeSize
+      DisableApiTermination: !Ref DisableApiTermination
+      EbsOptimized: !Ref EbsOptimized
+      IamInstanceProfile: !If
+         - isIamInstanceProfile
+         - !Sub IamInstanceProfile
+         - !Ref "AWS::NoValue"
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      Monitoring: !Ref Monitoring
+      PlacementGroupName: !If
+         - isPlacementGroupName
+         - !Sub PlacementGroupName
+         - !Ref "AWS::NoValue"
+      SecurityGroupIds:
+        - !Ref InstanceSecurityGroup
+      SourceDestCheck: !Ref SourceDestCheck
+      SubnetId:
+        Fn::ImportValue:
+          !Sub "mediawiki-vpc-${Environment}-subnet1-id"
+      Tags:
+          - Key: Name
+            Value: !Sub '${Name}-${Environment}-Application-EC2'
+          - Key: Owner
+            Value: DevOps
+          - Key: Ec2Deploymet
+            Value: yes
+          - Key: CostCenter
+            Value: !Ref CostCenter
+          - Key: Environment
+            Value: !Ref Environment
+          - Key: Project
+            Value: !Ref Project
+          - Key: Support
+            Value: !Ref Support
+      Tenancy: !Ref Tenancy
+      UserData:
+        Fn::Base64:
+         !Sub |
+             #!/bin/bash -ex
+             sudo apt-add-repository ppa:ansible/ansible -y
+             sudo apt-get update -y
+             sudo apt-get install ansible -y
+             cd /home/ubuntu
+             sudo git clone https://github.com/vigneshselvamss/thoughtworks-app
+             cd  thoughtworks-app
+             sudo ansible-playbook mediawiki-playbook.yml
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to client host
+      VpcId:
+         Fn::ImportValue:
+           !Sub "mediawiki-vpc-${Environment}-id"
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0

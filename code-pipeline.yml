@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This Stack will Create the Code-Pipeline, Code-Build, Code-Commit, Code-Deploy'
+#Programer: Vignesh.selvam
+
+Parameters:
+  RepositoryName:
+    Type: String
+    Default: Mediawiki-Repo
+
+  ApplicationName:
+    Type: String
+    Default: webapp
+
+  CodePipelineName:
+    Type: String
+    Default: MediawikiPipeline
+
+  CodeBuildServiceRoleArn:
+     Type: String
+
+  CodeDeployServiceRoleArn:
+     Type: String
+
+  CodePipelineServiceRoleArn:
+    Type: String
+
+  Pipeline-ArtifactStore-Location:
+     Type: String
+
+Resources:
+  CreateRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Ref RepositoryName
+      RepositoryDescription: Application-Repo
+
+  BuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: myProjectName
+      Description: Web Application
+      ServiceRole: !Ref CodeBuildServiceRoleArn
+      Artifacts:
+        Type: no_artifacts
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:2.0
+      Source:
+        Type: CODECOMMIT
+        Location: !Sub 'https://git-codecommit.us-west-2.amazonaws.com/v1/repos/${RepositoryName}'
+      TimeoutInMinutes: 60
+
+  DeploymentApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Ref ApplicationName
+      ComputePlatform: Server
+
+  DeploymentGroup:
+    DependsOn: DeploymentApplication
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref DeploymentApplication
+      DeploymentStyle:
+        DeploymentType: IN_PLACE
+        DeploymentOption: WITHOUT_TRAFFIC_CONTROL
+      DeploymentGroupName: WebTier-Deployment
+      DeploymentConfigName: CodeDeployDefault.AllAtOnce
+      Ec2TagFilters:
+        - Key: Ec2Deploymet
+          Value: yes
+          Type: KEY_AND_VALUE
+      ServiceRoleArn: !Ref CodeDeployServiceRoleArn
+
+  WebAppPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Location: !Ref Pipeline-ArtifactStore-Location
+        Type: S3
+      Name: !Ref CodePipelineName
+      RoleArn: !Ref CodePipelineServiceRoleArn
+      Stages:
+        - Name: Source
+          Actions:
+          - Name: Source
+            ActionTypeId:
+              Category: Source
+              Owner: AWS
+              Version: 1
+              Provider: CodeCommit
+            OutputArtifacts:
+            - Name: SourceArtifact
+            Configuration:
+              RepositoryName: !GetAtt CreateRepository.Name
+              BranchName: master
+        - Name: Build
+          Actions:
+          - Name: Build
+            ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Version: 1
+              Provider: CodeBuild
+            Region: us-west-2
+            InputArtifacts:
+            - Name: SourceArtifact
+            OutputArtifacts:
+            - Name: BuildArtifact
+            Configuration:
+              ProjectName: !Ref BuildProject
+        - Name: Deploy
+          Actions:
+          - Name: Deploy
+            ActionTypeId:
+              Category: Deploy
+              Owner: AWS
+              Version: 1
+              Provider: CodeDeploy
+            Region: us-west-2
+            InputArtifacts:
+            - Name: BuildArtifact
+            Configuration:
+              ApplicationName: !Ref DeploymentApplication
+              DeploymentGroupName: !Ref DeploymentGroup

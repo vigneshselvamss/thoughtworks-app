@@ -1,0 +1,212 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This Stack Crate VPC with 2public Sub, IGW, RT'
+#Programer: Vignesh.selvam
+
+Parameters:
+  CidrBlock :
+     Type: String
+     Default: 10.0.0.0/16
+  EnableDnsSupport:
+     Type: String
+     Default: false
+  EnableDnsHostnames :
+     Type: String
+     Default: false
+  Environment:
+     Type: String
+     AllowedValues: [dev, tst, int, uat, prd, poc]
+     Default: dev
+  InstanceTenancy:
+     Type: String
+     AllowedValues: [default, dedicated]
+     Default: default
+  MapPublicIpOnLaunch:
+     Type: String
+     Default: true
+  CostCenter:
+     Type: String
+     Default: IND
+  Project:
+     Type: String
+     Default: mediawiki
+  Support:
+       Type: String
+       Default: vignesh.selvam
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.1.0/24
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.2.0/24
+  Name:
+    Type: String
+    Default: mediawiki-vpc
+
+Conditions:
+  isEnableDnsSupportEnable: !Not [!Equals [!Ref EnableDnsSupport, false]]
+  isEnableDnsHostnamesEnable: !Not [!Equals [!Ref EnableDnsHostnames, false]]
+
+Resources:
+   CreateVpc:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: !Ref CidrBlock
+        EnableDnsSupport: !If
+           - isEnableDnsSupportEnable
+           - !Sub EnableDnsSupport
+           - !Ref "AWS::NoValue"
+        EnableDnsHostnames: !If
+           - isEnableDnsHostnamesEnable
+           - !Sub EnableDnsHostnames
+           - !Ref "AWS::NoValue"
+        InstanceTenancy: !Ref InstanceTenancy
+        Tags:
+           - Key: Name
+             Value: !Sub '${Name}-${Environment}-VPC'
+           - Key: CostCenter
+             Value: !Ref CostCenter
+           - Key: Environment
+             Value: !Ref Environment
+           - Key: Project
+             Value: !Ref Project
+           - Key: Support
+             Value: !Ref Support
+
+   CreateRouteTable:
+      Type: AWS::EC2::RouteTable
+      DependsOn: CreateVpc
+      Properties:
+        VpcId:
+          Ref: CreateVpc
+        Tags:
+           - Key: Name
+             Value: !Sub '${Name}-${Environment}-Rt'
+           - Key: CostCenter
+             Value: !Ref CostCenter
+           - Key: Environment
+             Value: !Ref Environment
+           - Key: Project
+             Value: !Ref Project
+           - Key: Support
+             Value: !Ref Support
+
+   CreateInternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub '${Name}-${Environment}-IGW'
+          - Key: CostCenter
+            Value: !Ref CostCenter
+          - Key: Environment
+            Value: !Ref Environment
+          - Key: Project
+            Value: !Ref Project
+          - Key: Support
+            Value: !Ref Support
+
+   AttachGateway:
+      Type: AWS::EC2::VPCGatewayAttachment
+      DependsOn: CreateInternetGateway
+      Properties:
+        VpcId:
+           Ref: CreateVpc
+        InternetGatewayId:
+           Ref: CreateInternetGateway
+
+   CreateRoute:
+        Type: AWS::EC2::Route
+        DependsOn:
+          - CreateRouteTable
+          - CreateInternetGateway
+        Properties:
+           RouteTableId:
+             Ref: CreateRouteTable
+           DestinationCidrBlock: 0.0.0.0/0
+           GatewayId:
+             Ref: CreateInternetGateway
+
+   CreatePublicSubnet1:
+        Type: AWS::EC2::Subnet
+        DependsOn: CreateVpc
+        Properties:
+          VpcId:
+            Ref: CreateVpc
+          CidrBlock: !Ref PublicSubnet1CIDR
+          AvailabilityZone: !Select [ 0, !GetAZs '' ]
+          MapPublicIpOnLaunch: !Ref MapPublicIpOnLaunch
+          Tags:
+             - Key: Name
+               Value: !Sub '${Name}-${Environment}-Public-sub-1'
+             - Key: CostCenter
+               Value: !Ref CostCenter
+             - Key: Environment
+               Value: !Ref Environment
+             - Key: Project
+               Value: !Ref Project
+             - Key: Support
+               Value: !Ref Support
+
+   CreatePublicSubnet2:
+         Type: AWS::EC2::Subnet
+         DependsOn: CreateVpc
+         Properties:
+           VpcId:
+             Ref: CreateVpc
+           CidrBlock: !Ref PublicSubnet2CIDR
+           AvailabilityZone: !Select [ 1, !GetAZs '' ]
+           MapPublicIpOnLaunch: !Ref MapPublicIpOnLaunch
+           Tags:
+              - Key: Name
+                Value: !Sub '${Name}-${Environment}-Public-sub-2'
+              - Key: CostCenter
+                Value: !Ref CostCenter
+              - Key: Environment
+                Value: !Ref Environment
+              - Key: Project
+                Value: !Ref Project
+              - Key: Support
+                Value: !Ref Support
+
+   SubnetRouteTableAssociation1:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        DependsOn: CreatePublicSubnet1
+        Properties:
+          SubnetId:
+            Ref: CreatePublicSubnet1
+          RouteTableId:
+            Ref: CreateRouteTable
+
+   SubnetRouteTableAssociation2:
+       Type: AWS::EC2::SubnetRouteTableAssociation
+       DependsOn: CreatePublicSubnet2
+       Properties:
+         SubnetId:
+           Ref: CreatePublicSubnet2
+         RouteTableId:
+           Ref: CreateRouteTable
+
+Outputs:
+ VpcId:
+   Value: !Ref CreateVpc
+   Export:
+    Name: !Sub '${Name}-${Environment}-id'
+
+ publicsubnet1Id:
+   Value: !Ref CreatePublicSubnet1
+   Export:
+    Name: !Sub '${Name}-${Environment}-subnet1-id'
+
+ publicsubnet2Id:
+    Value: !Ref CreatePublicSubnet1
+    Export:
+     Name: !Sub '${Name}-${Environment}-subnet2-id'
+
+ publicsubnet1ZoneId:
+    Value: !GetAtt
+      - CreatePublicSubnet1
+      - AvailabilityZone
+    Export:
+     Name: !Sub '${Name}-${Environment}-subnet1-zone-id'
